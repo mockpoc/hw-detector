@@ -5,6 +5,14 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "espconn/espconn_tcp.h"
+#include "gpio.h"
+// Ajouter 
+// void gpio_config(GPIO_ConfigTypeDef *pGPIOConfig);
+
+// #define ETS_GPIO_INTR_ENABLE() _xt_isr_unmask(1 << ETS_GPIO_INUM) //ENABLE INTERRUPTS
+// #define ETS_GPIO_INTR_DISABLE() _xt_isr_mask(1 << ETS_GPIO_INUM) //DISABLE INTERRUPTS
+
+// dans gpio.h
 
 // Dectection mouvement à l'aide d'un HC-SR505 PIR.
 // au démarrage, l'esp8266 tente de se connecter à la box avec une IP 192.168.1.2x
@@ -281,9 +289,28 @@ void wifi_init_stack(void)
     if(ret == true) printf("connected ! \n");
 }
 
+void gpio_0_intr(void* pArg)
+{
+    uint16 gpio_status = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
+
+    if (gpio_status & (BIT(0)))
+    {
+        printf("pressed ! \n");
+    }
+    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpio_status);
+}
+
 void init_gpio(void)
 {
-
+    GPIO_ConfigTypeDef gpioCfg = {
+    .GPIO_Pin = GPIO_Pin_0,
+    .GPIO_Mode = GPIO_Mode_Input,
+    .GPIO_Pullup = GPIO_PullUp_EN,
+    .GPIO_IntrType =GPIO_PIN_INTR_NEGEDGE
+    };
+    gpio_config(&gpioCfg);
+    gpio_intr_handler_register(gpio_0_intr, NULL);
+    ETS_GPIO_INTR_ENABLE();
 }
 
 void http_post(void)
@@ -300,23 +327,24 @@ void task_main(void* ignore)
 {
     xSemaphoreTake(semaphore, portMAX_DELAY);
     init_gpio();
-    wifi_init_stack();
-    xSemaphoreTake(semaphore, portMAX_DELAY);
-    printf("will send message ...\n");
-    send_data();
+    // wifi_init_stack();
+    // xSemaphoreTake(semaphore, portMAX_DELAY);
+    // printf("will send message ...\n");
+    // send_data();
     // read_state();
     while(1)
     {
         vTaskDelay(100);
     }
-    http_post();
-    init_sleep();
+    // http_post();
+    // init_sleep();
 }
 
 
 void user_init(void)
 {
     printf("Starting ...\n");
+    printf("sdk version : %s\n", system_get_sdk_version());
     vSemaphoreCreateBinary( semaphore );
     xTaskCreate(&task_main, "startup", 2048, NULL, 1, NULL);
 }
